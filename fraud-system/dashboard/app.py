@@ -218,7 +218,7 @@ if view == "Overview Dashboard":
     with col2:
         # Load clusters summary from API
         try:
-            r_clusters = requests.post(f"{API_URL}/cluster", timeout=5).json()
+            r_clusters = requests.post(f"{API_URL}/cluster", timeout=120).json()
             total_c = r_clusters.get("total_clusters", 0)
             high_c = r_clusters.get("high_risk_clusters_count", 0)
             elevated_c = total_c - high_c
@@ -299,7 +299,7 @@ elif view == "Cluster Explorer":
     
     # Load cluster summary
     try:
-        r_clusters = requests.post(f"{API_URL}/cluster", timeout=5).json()
+        r_clusters = requests.post(f"{API_URL}/cluster", timeout=120).json()
         clusters_list = r_clusters.get("clusters", [])
     except Exception as e:
         st.error(f"Error fetching clusters: {e}")
@@ -350,7 +350,7 @@ elif view == "Cluster Explorer":
     with col1:
         # Load cluster nodes and edges for visualization
         try:
-            r_graph = requests.get(f"{API_URL}/cluster-graph/{selected_cid}", timeout=5).json()
+            r_graph = requests.get(f"{API_URL}/cluster-graph/{selected_cid}", timeout=120).json()
             nodes = r_graph.get("nodes", [])
             edges = r_graph.get("edges", [])
         except Exception as e:
@@ -447,7 +447,7 @@ elif view == "Node Investigator":
     if node_id_input:
         try:
             node_id_val = int(node_id_input.strip())
-            r_node = requests.post(f"{API_URL}/predict", json={"node_id": node_id_val}, timeout=5)
+            r_node = requests.post(f"{API_URL}/predict", json={"node_id": node_id_val}, timeout=120)
             
             if r_node.status_code == 404:
                 st.error("Transaction ID not found in the transaction graph.")
