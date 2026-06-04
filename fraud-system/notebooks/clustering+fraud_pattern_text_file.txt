@@ -1,0 +1,736 @@
+# Install PyTorch Geometric dependencies
+import torch
+TORCH_VERSION = torch.__version__.split('+')[0]
+CUDA_VERSION = "cpu"  # Colab handles GPU automatically
+
+!pip install -q torch-scatter -f https://data.pyg.org/whl/torch-{TORCH_VERSION}+{CUDA_VERSION}.html
+!pip install -q torch-sparse -f https://data.pyg.org/whl/torch-{TORCH_VERSION}+{CUDA_VERSION}.html
+!pip install -q torch-cluster -f https://data.pyg.org/whl/torch-{TORCH_VERSION}+{CUDA_VERSION}.html
+!pip install -q torch-spline-conv -f https://data.pyg.org/whl/torch-{TORCH_VERSION}+{CUDA_VERSION}.html
+!pip install -q torch-geometric
+
+
+import kagglehub
+import pandas as pd
+import torch.nn as nn
+import torch.nn.functional as F
+from torch_geometric.data import Data
+from torch_geometric.nn import GATConv, GCNConv, GINConv, SAGEConv, MessagePassing
+from types import SimpleNamespace
+from sklearn.metrics import accuracy_score, recall_score, f1_score
+import numpy as np
+import os
+
+# Download latest version
+path = kagglehub.dataset_download("ellipticco/elliptic-data-set")
+
+print("Path to dataset files:", path)
+
+!git clone https://github.com/AbhishiktaGhosh/bitcoin-fraud-detection.git
+
+%cd bitcoin-fraud-detection
+
+
+
+# Change directory back to content for data processing
+%cd /content
+
+
+
+
+
+
+
+
+
+
+!ls
+
+
+
+
+
+import pandas as pd
+import numpy as np
+import networkx as nx
+
+# Load data
+edges_df = pd.read_csv("elliptic_txs_edgelist.csv")
+features_df = pd.read_csv("elliptic_txs_features.csv", header=None)
+
+# Node IDs
+tx_ids = features_df[0].values
+node_to_idx = {tx: i for i, tx in enumerate(tx_ids)}
+idx_to_node = {i: tx for tx, i in node_to_idx.items()}
+
+
+
+
+
+
+
+G = nx.DiGraph()   # IMPORTANT: keep direction (fixes major flaw)
+
+edges = []
+for u, v in zip(edges_df["txId1"], edges_df["txId2"]):
+    if u in node_to_idx and v in node_to_idx:
+        ui, vi = node_to_idx[u], node_to_idx[v]
+        edges.append((ui, vi))
+
+G.add_edges_from(edges)
+print("Nodes:", G.number_of_nodes(), "Edges:", G.number_of_edges())
+
+
+
+
+
+G.add_nodes_from(range(len(tx_ids)))
+
+
+
+
+print("Features:", len(tx_ids))
+print("Probs:", len(probs))
+print("Graph nodes:", G.number_of_nodes())
+
+
+
+
+valid_len = len(probs)
+
+# Restrict graph to only valid nodes
+G = G.subgraph(range(valid_len)).copy()
+
+node_probs = {i: probs[i] for i in range(valid_len)}
+
+
+
+
+
+
+missing = set(range(len(tx_ids))) - set(range(len(probs)))
+print("Missing node index:", missing)
+
+
+
+
+import numpy as np
+
+probs = np.load("final_probs.npy")
+
+
+
+
+
+print("Graph nodes:", G.number_of_nodes())
+print("Probs length:", len(probs))
+
+
+
+
+
+graph_nodes = set(G.nodes())
+expected_nodes = set(range(len(probs)))
+
+print("Extra nodes in graph:", graph_nodes - expected_nodes)
+print("Missing nodes in graph:", expected_nodes - graph_nodes)
+
+
+
+
+
+probs = np.load("final_probs.npy").astype(float)
+
+valid_nodes = set(G.nodes()).intersection(set(range(len(probs))))
+
+G = G.subgraph(valid_nodes).copy()
+node_probs = {i: probs[i] for i in valid_nodes}
+
+assert len(node_probs) == G.number_of_nodes()
+
+print("Using", len(valid_nodes), "nodes out of", len(tx_ids))
+
+
+
+
+
+
+import pandas as pd
+
+edges_df = pd.read_csv("elliptic_txs_edgelist.csv")
+edges_df.head()
+
+
+
+
+
+edges = []
+
+for u, v in zip(edges_df["txId1"], edges_df["txId2"]):
+    if u in node_to_idx and v in node_to_idx:
+        edges.append((node_to_idx[u], node_to_idx[v]))
+
+
+
+
+
+features_df = pd.read_csv("elliptic_txs_features.csv", header=None)
+
+tx_ids = features_df[0].values
+
+node_to_idx = {tx_id: idx for idx, tx_id in enumerate(tx_ids)}
+idx_to_node = {idx: tx_id for tx_id, idx in node_to_idx.items()}
+
+
+
+
+edge_list = [
+    (node_to_idx[u], node_to_idx[v])
+    for u, v in zip(edges_df['txId1'], edges_df['txId2'])
+    if u in node_to_idx and v in node_to_idx
+]
+
+
+
+
+
+
+import networkx as nx
+
+G = nx.DiGraph()
+G.add_edges_from(edge_list)
+
+
+
+
+import numpy as np
+
+probs = np.load("final_probs.npy").astype(float)
+
+
+
+
+node_probs = {i: probs[i] for i in valid_nodes}
+
+
+
+
+
+valid_nodes = set(G.nodes()).intersection(set(range(len(probs))))
+
+G = G.subgraph(valid_nodes).copy()
+
+node_probs = {i: probs[i] for i in valid_nodes}
+
+print("Using", len(valid_nodes), "nodes out of", len(tx_ids))
+
+
+
+
+len(node_probs), G.number_of_nodes()
+
+
+
+
+!pip install python-louvain
+
+
+
+
+
+import community.community_louvain as community_louvain
+
+UG = G.to_undirected()
+
+partition = community_louvain.best_partition(UG)
+
+
+
+
+print(list(partition.items())[:5])
+
+
+
+
+
+
+from collections import defaultdict
+
+clusters = defaultdict(list)
+
+for node, cid in partition.items():
+    clusters[cid].append(node)
+
+
+
+
+
+
+cluster_stats = {}
+
+for cid, nodes in clusters.items():
+    scores = [node_probs[n] for n in nodes if n in node_probs]
+
+    if len(scores) == 0:
+        continue
+
+    scores = np.array(scores)
+
+    cluster_stats[cid] = {
+        "mean": np.mean(scores),
+        "max": np.max(scores),
+        "p90": np.percentile(scores, 90),
+        "size": len(nodes)
+    }
+
+
+
+
+
+
+
+
+all_scores = np.array([v["mean"] for v in cluster_stats.values()])
+
+mean = np.mean(all_scores)
+std = np.std(all_scores)
+
+fraud_clusters = []
+
+for cid, stats in cluster_stats.items():
+    z = (stats["mean"] - mean) / (std + 1e-9)
+
+    if z > 2.0:
+        fraud_clusters.append(cid)
+
+
+
+
+
+
+
+fraud_clusters = []
+
+all_scores = np.array([v["mean"] for v in cluster_stats.values()])
+mean = np.mean(all_scores)
+std = np.std(all_scores)
+
+for cid, stats in cluster_stats.items():
+    z = (stats["mean"] - mean) / (std + 1e-9)
+
+    if z > 2.0:
+        fraud_clusters.append(cid)
+
+
+
+
+
+
+print("Number of fraud rings:", len(fraud_clusters))
+
+
+
+
+
+
+scores = [v["mean"] for v in cluster_stats.values()]
+
+print("Max score:", max(scores))
+print("Min score:", min(scores))
+print("Average score:", sum(scores)/len(scores))
+
+
+
+
+
+
+sizes = [len(nodes) for nodes in clusters.values()]
+
+print("Max cluster size:", max(sizes))
+print("Average cluster size:", sum(sizes)/len(sizes))
+
+
+
+
+
+
+
+
+
+top_clusters = sorted(
+    cluster_stats.items(),
+    key=lambda x: x[1]["mean"],
+    reverse=True
+)
+
+for cid, stats in top_clusters[:5]:
+    print(f"Cluster {cid}")
+    print(f"  Mean: {stats['mean']:.3f}")
+    print(f"  Max: {stats['max']:.3f}")
+    print(f"  P90: {stats['p90']:.3f}")
+    print(f"  Size: {stats['size']}")
+
+
+
+
+
+
+
+
+
+import matplotlib.pyplot as plt
+
+# take first fraud cluster ID
+cid = fraud_clusters[0]
+
+# get its nodes
+nodes = clusters[cid]
+
+# use undirected graph for visualization
+subG = UG.subgraph(nodes)
+
+# color nodes by fraud probability
+node_colors = [node_probs[n] for n in subG.nodes()]
+
+plt.figure(figsize=(8, 6))
+nx.draw(
+    subG,
+    node_color=node_colors,
+    cmap=plt.cm.Reds,
+    node_size=20,
+    with_labels=False
+)
+
+plt.title(f"Cluster {cid}")
+plt.show()
+
+
+
+
+
+
+
+
+
+
+node_colors = [node_probs[n] for n in subG.nodes()]
+
+plt.figure(figsize=(8,6))
+nx.draw(
+    subG,
+    node_color=node_colors,
+    node_size=40,
+    cmap=plt.cm.Reds,
+    with_labels=False
+)
+plt.show()
+
+
+
+
+
+
+
+
+
+
+for cid in fraud_clusters:
+    nodes = clusters[cid]
+
+    if 50 < len(nodes) < 300:
+        sample_nodes = nodes
+        break
+
+
+
+
+
+
+selected_clusters = []
+
+for cid in fraud_clusters:
+    nodes = clusters[cid]
+    size = len(nodes)
+
+    if 50 < size < 200:
+        selected_clusters.append(cid)
+    elif 200 < size < 1000:
+        selected_clusters.append(cid)
+    elif size > 1000:
+        selected_clusters.append(cid)
+
+    if len(selected_clusters) == 3:
+        break
+
+
+
+
+
+
+
+
+for i, cid in enumerate(selected_clusters):
+    nodes = clusters[cid]
+    subG = UG.subgraph(nodes)
+
+    node_colors = [node_probs[n] for n in subG.nodes()]
+
+    plt.figure(figsize=(6,5))
+    nx.draw(
+        subG,
+        node_color=node_colors,
+        node_size=20,
+        cmap=plt.cm.Reds,
+        with_labels=False
+    )
+    plt.title(f"Fraud Cluster {cid}")
+    plt.show()
+
+
+
+
+
+
+
+
+
+for i, cid in enumerate(selected_clusters):
+    nodes = clusters[cid]
+    subG = UG.subgraph(nodes)
+
+    node_colors = [node_probs[n] for n in subG.nodes()]
+
+    plt.figure(figsize=(6,5))
+
+    nx.draw(
+        subG,
+        node_color=node_colors,
+        node_size=30,
+        cmap=plt.cm.Reds,
+        with_labels=False
+    )
+
+    plt.title(f"Fraud Cluster {cid}")
+    plt.show()
+
+
+
+
+
+
+
+
+
+
+cid = fraud_clusters[0]
+print(clusters[cid][:10])
+
+
+
+
+
+
+
+print("Total clusters:", len(clusters))
+print("Fraud rings detected:", len(fraud_clusters))
+
+
+
+
+
+
+
+
+top_clusters = sorted(
+    cluster_stats.items(),
+    key=lambda x: x[1]["mean"],
+    reverse=True
+)[:5]
+
+for cid, stats in top_clusters:
+    print(f"Cluster {cid}")
+    print(f"  Mean: {stats['mean']:.3f}")
+    print(f"  Max: {stats['max']:.3f}")
+    print(f"  P90: {stats['p90']:.3f}")
+    print(f"  Size: {stats['size']}")
+
+
+
+
+
+
+
+
+
+G_full = G.copy()
+
+
+for cid in fraud_clusters:
+    nodes = clusters[cid]
+    subgraph = UG.subgraph(nodes)
+
+
+
+
+
+deg = np.mean([d for _, d in subgraph.degree()])
+density = nx.density(subgraph)
+clustering = nx.average_clustering(subgraph)
+
+
+
+
+print("Fraud clusters:", len(fraud_clusters))
+
+for cid in fraud_clusters[:3]:  # sample few
+    nodes = clusters[cid]
+    sg = UG.subgraph(nodes)
+
+    print(f"\nCluster {cid}")
+    print(" Nodes:", sg.number_of_nodes())
+    print(" Edges:", sg.number_of_edges())
+
+
+
+
+
+print("Fraud clusters:", len(fraud_clusters))
+
+
+
+
+print("Total clusters:", len(clusters))
+print("Fraud clusters:", len(fraud_clusters))
+
+
+
+
+
+
+print("Fraud clusters:", len(fraud_clusters))
+
+
+
+
+for cid in fraud_clusters:
+    nodes = clusters[cid]
+    subgraph = UG.subgraph(nodes)
+
+
+
+
+
+
+print(f"Cluster {cid}: deg={deg:.2f}, dens={density:.3f}, clust={clustering:.3f}")
+
+
+
+
+
+# Collect metrics first
+deg_list = []
+dens_list = []
+clust_list = []
+
+cluster_metrics = {}
+
+for cid in fraud_clusters:
+    nodes = clusters[cid]
+    subgraph = UG.subgraph(nodes)
+
+    deg = np.mean([d for _, d in subgraph.degree()])
+    density = nx.density(subgraph)
+    clustering = nx.average_clustering(subgraph)
+
+    deg_list.append(deg)
+    dens_list.append(density)
+    clust_list.append(clustering)
+
+    cluster_metrics[cid] = (deg, density, clustering)
+
+
+# Compute adaptive thresholds
+deg_thr = np.percentile(deg_list, 80)
+dens_thr = np.percentile(dens_list, 75)
+clust_thr = np.percentile(clust_list, 70)
+
+
+# Pattern classification
+cluster_patterns = {}
+
+for cid, (deg, density, clustering) in cluster_metrics.items():
+
+    if density > dens_thr or clustering > clust_thr:
+        pattern = "fraud_ring"
+    elif deg > deg_thr:
+        pattern = "hub_spoke"
+    else:
+        pattern = "chain/mixed"
+
+    cluster_patterns[cid] = pattern
+
+
+
+
+
+
+
+
+
+
+for cid, pattern in list(cluster_patterns.items())[:10]:
+    print(f"Cluster {cid}: {pattern}")
+
+
+
+
+
+
+
+
+from collections import Counter
+
+print(Counter(cluster_patterns.values()))
+
+
+
+
+
+
+
+
+
+print([len(clusters[cid]) for cid in fraud_clusters])
+
+
+
+
+
+for i, cid in enumerate(fraud_clusters[:3]):
+    print("Cluster", cid, "size:", len(clusters[cid]))
+
+
+
+
+
+
+cluster_summary = []
+
+for cid in fraud_clusters:
+    nodes = clusters[cid]
+    subgraph = UG.subgraph(nodes)
+
+    cluster_summary.append({
+        "Cluster": cid,
+        "Size": len(nodes),
+        "Density": nx.density(subgraph),
+        "Pattern": cluster_patterns[cid]
+    })
+
+for row in cluster_summary:
+    print(row)
+
+
+
+
+

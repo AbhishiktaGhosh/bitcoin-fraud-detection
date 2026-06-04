@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+streamlit
+pandas
+numpy
+scikit-learn
+xgboost
+networkx
+python-louvain
+plotly
+pyvis
+pydantic
+joblib
+python-dotenv
+onnxruntime
+matplotlib
+jinja2
